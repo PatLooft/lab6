@@ -69,6 +69,25 @@ int main(int argc, char* argv[])
 	MPI_Send(buffer, ncols, MPI_DOUBLE, i+1, i+1, MPI_COMM_WORLD);
 	numsent++;
       }
+
+      for(i = 0; i < nrows; i++){
+	MPI_Recv(&ans, 1, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG,
+		 MPI_COMM_WORLD, &status);
+	sender = status.MPI_SOURCE;
+	anstype = status.MPI_TAG;
+	c[anstype - 1] = ans;
+	if(numsent < nrows){
+	  for(j = 0;; j < ncols; j++){
+	    buffer[j] = aa[numsent * ncols + j];
+	  }
+	  MPI_Send(buffer, ncols, MPI_DOUBLE, sender, numsent + 1,
+		   MPI_COMM_WORLD);
+	  numsent++;
+	}
+	else{
+	  MPI_SEND(MPI_BOTTOM, 0 MPI_DOUBLE, sender, 0, MPI_COMM_WORLD);
+	}
+      }
       ///////////////////////////////////////////////
       endtime = MPI_Wtime();
       printf("%f\n",(endtime - starttime));
@@ -77,6 +96,18 @@ int main(int argc, char* argv[])
       compare_matrices(cc2, cc1, nrows, nrows);
     } else {
       // Slave Code goes here
+      MPI_Bcast(b, ncols, MPI_DOUBLE, master,
+		MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+      if(status.MPI_TAG == 0){
+	break;
+      }
+      row = status.MPI_TAG;
+      ans = 0.0;
+#pragma omp shared(ans) for reduction(+:ans)
+      for(j = 0; j < ncols; j++){
+	ans += buffer[j] * b[j];
+      }
+      MPI_Send(&ans, 1, MPI_DOUBLE, master, row, MPI_COMM_WORLD);
       //////////////////////////////////
     }
   } else {
