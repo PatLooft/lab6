@@ -18,13 +18,19 @@ void compare_matrix(double *a, double *b, int nRows, int nCols);
 int main(int argc, char* argv[])
 {
   int nrows, ncols;
-  double *aa;	/* the A matrix */
-  double *bb;	/* the B matrix */
+  double *aa, *b, *c;	/* the A matrix */
+  // double *bb;	/* the B matrix */
   double *cc1;	/* A x B computed using the omp-mpi code you write */
   double *cc2;	/* A x B computed using the conventional algorithm */
-  int myid, numprocs;
+  int run_index;
+  int nruns;
+  int myid, master, numprocs;
   double starttime, endtime;
   MPI_Status status;
+  int i, j, numsent, sender;
+  int anstype, row;
+  srand(time(0));
+  
   /* insert other global variables here */
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
@@ -32,13 +38,38 @@ int main(int argc, char* argv[])
   if (argc > 1) {
     nrows = atoi(argv[1]);
     ncols = nrows;
-    if (myid == 0) {
+
+    aa = (double*)malloc(sizeof(double) * nrows * ncols);
+    b = (double*)malloc(sizeof(couble) * ncols);
+    c = (double*)malloc(sizeof(double) * nrows);
+    buffer = (double*)malloc(sizeof(double) * ncols);
+    master = 0;
+ 
+    if (myid == master) {
       // Master Code goes here
-      aa = gen_matrix(nrows, ncols);
-      bb = gen_matrix(ncols, nrows);
-      cc1 = malloc(sizeof(double) * nrows * nrows); 
+      //PUT YOUR CODE BETWEEN COMMENTS
+      for(i = 0; i < nrows; i++){
+	for(j = 0; j <ncols; j++){
+	  aa[i * ncols + j] = (double)rand()/RAND_MAX;
+	}
+      }
+      ///////////////////////
+      //aa = gen_matrix(nrows, ncols);
+      //bb = gen_matrix(ncols, nrows);
+      //cc1 = malloc(sizeof(double) * nrows * nrows); 
       starttime = MPI_Wtime();
       /* Insert your master code here to store the product into cc1 */
+      //YOUR CODE GOES HERE
+      numsent = 0;
+      MPI_Bcast(b, ncols, MPI_DOUBLE, master, MPI_COMM_WORLD);
+      for(i = 0; i < min(numprocs-1, nrows); i++){
+	for(j = 0; j < ncols; j++){
+	  buffer[j] = aa[i * ncols + j];
+	}
+	MPI_Send(buffer, ncols, MPI_DOUBLE, i+1, i+1, MPI_COMM_WORLD);
+	numsent++;
+      }
+      ///////////////////////////////////////////////
       endtime = MPI_Wtime();
       printf("%f\n",(endtime - starttime));
       cc2  = malloc(sizeof(double) * nrows * nrows);
@@ -46,10 +77,30 @@ int main(int argc, char* argv[])
       compare_matrices(cc2, cc1, nrows, nrows);
     } else {
       // Slave Code goes here
+      //////////////////////////////////
     }
   } else {
     fprintf(stderr, "Usage matrix_times_vector <size>\n");
   }
   MPI_Finalize();
   return 0;
+}
+
+int mmult_omp(double *c, double *a, int aRows, int aCols,
+	      double *b, int bRows, int bCols){
+  int i, j, k;
+
+#pragma omp parallel default(none) shared(a,b,c, aRows, bRows, bCols) private(i,k,j)
+#pragma omp for
+  for(i = 0; i < aRows; i++){
+    for(j = 0; j < bCols; j++){
+      c[i*bCols + j] = 0;
+    }
+    for(k = 0; k < aCols; k++){
+      for(j = 0; j < bCols; j++){
+	c[i * bCols + j] += a[i * aCols + k]*b[k * bCols + j];
+      }
+    }
+  }
+    return 0;
 }

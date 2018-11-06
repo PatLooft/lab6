@@ -32,6 +32,8 @@ int main(int argc, char* argv[])
     master = 0;
     if (myid == master) {
       // Master Code goes here
+
+      /////////////////////////////
       for (i = 0; i < nrows; i++) {
 	for (j = 0; j < ncols; j++) {
 	  aa[i*ncols + j] = (double)rand()/RAND_MAX;
