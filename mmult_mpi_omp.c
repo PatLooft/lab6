@@ -6,7 +6,7 @@
 #define min(x, y) ((x)<(y)?(x):(y))
 
 double* gen_matrix(int n, int m);
-int mmult(double *c, double *a, int aRows, int aCols, double *b, int bRows, int bCols);
+int mmult_omp(double *c, double *a, int aRows, int aCols, double *b, int bRows, int bCols);
 void compare_matrix(double *a, double *b, int nRows, int nCols);
 
 /** 
@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
 {
   int nrows, ncols;
   double *aa, *b, *c;	/* the A matrix */
-  // double *bb;	/* the B matrix */
+  double *bb;	/* the B matrix */
   double *cc1;	/* A x B computed using the omp-mpi code you write */
   double *cc2;	/* A x B computed using the conventional algorithm */
   double *buffer, ans;
@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     ncols = nrows;
 
     aa = (double*)malloc(sizeof(double) * nrows * ncols);
-    b = (double*)malloc(sizeof(couble) * ncols);
+    b = (double*)malloc(sizeof(double) * ncols);
     c = (double*)malloc(sizeof(double) * nrows);
     buffer = (double*)malloc(sizeof(double) * ncols);
     master = 0;
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
 	  numsent++;
 	}
 	else{
-	  MPI_SEND(MPI_BOTTOM, 0, MPI_DOUBLE, sender, 0, MPI_COMM_WORLD);
+	  MPI_Send(MPI_BOTTOM, 0, MPI_DOUBLE, sender, 0, MPI_COMM_WORLD);
 	}
       }
       ///////////////////////////////////////////////
@@ -100,8 +100,7 @@ int main(int argc, char* argv[])
     }
     else {
       // Slave Code goes here
-      MPI_Bcast(b, ncols, MPI_DOUBLE, master,
-		MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+      MPI_Bcast(b, ncols, MPI_DOUBLE, master, MPI_COMM_WORLD);
       if(myid <= nrows){
 	while(1){
 	  MPI_Recv(buffer, ncols, MPI_DOUBLE, master,
@@ -122,18 +121,20 @@ int main(int argc, char* argv[])
 	}
       //////////////////////////////////
     }
-  } else {
+  }
+  }
+    else {
     fprintf(stderr, "Usage matrix_times_vector <size>\n");
   }
   MPI_Finalize();
   return 0;
 }
 
-int mmult(double *c, double *a, int aRows, int aCols,
+int mmult_omp(double *c, double *a, int aRows, int aCols,
 	      double *b, int bRows, int bCols){
   int i, j, k;
 
-#pragma omp parallel default(none) shared(a,b,c, aRows, bRows, bCols) private(i,k,j)
+#pragma omp parallel default(none) shared(a,b,c, aRows, aCols, bRows, bCols) private(i,k,j)
 #pragma omp for
   for(i = 0; i < aRows; i++){
     for(j = 0; j < bCols; j++){
@@ -147,3 +148,4 @@ int mmult(double *c, double *a, int aRows, int aCols,
   }
     return 0;
 }
+
